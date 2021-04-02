@@ -5,13 +5,13 @@ const Twitter = require('twitter')
 const jsonfile = require('jsonfile')
 const config = require('./config')
 
-function getTweets () {
-  global.window = { YTD: { tweet: { } } }
-  require(config.path)
-  return window.YTD.tweet.part0.map(object => object.tweet)
+function getLikes () {
+  global.window = { YTD: { like: { } } }
+  require(config.like_path)
+  return window.YTD.like.part0.map(object => object.like)
 }
 
-const logFile = config.log || './logs/tweets-cleaner.log.json'
+const logFile = './logs/likes-cleaner.log.json'
 let log
 try {
   log = require(logFile)
@@ -19,8 +19,6 @@ try {
   console.log(chalk.cyan('No log file, starting a fresh delete cycle.'))
   log = []
 }
-
-let maxDate = config.maxDate ? new Date(config.maxDate) : new Date()
 
 const client = new Twitter({
   consumer_key: config.consumer_key,
@@ -32,30 +30,26 @@ const client = new Twitter({
 main()
 
 function main () {
-  const rawTweets = getTweets()
+  const rawLikes = getLikes()
 
-  const logIds = log.map(l => l.id)
-  const tweets = rawTweets.filter(t => {
-    const hasId = !isNaN(parseInt(t.id))
-    const oldEnough = new Date(t.created_at) < maxDate
-    const shouldBeSaved = config.saveRegexp.some((regexp) => new RegExp(regexp).test(t.full_text))
-    const notDeleted = logIds.indexOf(t.id) === -1
-    return hasId && oldEnough && notDeleted && !shouldBeSaved
+  const likes = rawLikes.filter(t => {
+    const hasId = !isNaN(parseInt(t.tweetId))
+    return hasId
   })
 
-  if (!tweets || !tweets.length) {
-    return console.log(chalk.green('No more tweets to delete!'))
+  if (!likes || !likes.length) {
+    return console.log(chalk.green('No more likes to delete!'))
   }
 
-  console.log(chalk.green(`Starting tweets cleaner on ${Date.now()} - Deleting tweets older than ${maxDate}`))
-  deleteTweet(tweets, 0)
+  console.log(chalk.green('Starting likes cleaner'))
+  deleteLike(likes, 0)
 }
 
-function deleteTweet (tweets, i) {
+function deleteLike (likes, i) {
   let next = config.callsInterval
   let remaining = 0
 
-  client.post('statuses/destroy', { id: tweets[i].id }, function (err, t, res) {
+  client.post('favorites/destroy', { id: likes[i].tweetId }, function (err, t, res) {
     remaining = parseInt(res.headers['x-rate-limit-remaining'])
 
     if (!isNaN(remaining) && remaining === 0) {
@@ -65,8 +59,8 @@ function deleteTweet (tweets, i) {
       if (err) {
         console.log(chalk.yellow(JSON.stringify(err)))
       } else {
-        log.push(tweets[i])
-        console.log(chalk.green(`Deleted -> ${tweets[i].id} | ${tweets[i].full_text}`))
+        log.push(likes[i])
+        console.log(chalk.green(`Deleted -> ${likes[i].tweetId} | ${likes[i].fullText}`))
       }
     }
 
@@ -75,13 +69,13 @@ function deleteTweet (tweets, i) {
         return console.log(chalk.red('ERROR WRITING JSON!'))
       }
 
-      if (i + 1 === tweets.length) {
+      if (i + 1 === likes.length) {
         return console.log(chalk.green('Done!'))
       }
 
       console.log(chalk.green(`Next call in ${next}ms`))
       setTimeout(function () {
-        deleteTweet(tweets, i + 1)
+        deleteLike(likes, i + 1)
       }, next)
     })
   })

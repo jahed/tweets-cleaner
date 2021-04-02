@@ -1,6 +1,9 @@
 config.js
 node_modules
+data
+logs
 *.csv
 
 .idea
 .DS_Store
+log*.json
